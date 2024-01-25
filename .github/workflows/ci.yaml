@@ -1,0 +1,355 @@
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  push:
+
+jobs:
+  ci:
+    runs-on: ubuntu-22.04
+    container: ghcr.io/rust-for-linux/ci
+
+    timeout-minutes: 70
+
+    strategy:
+      fail-fast: false
+      matrix:
+        tree:
+          - rust-next
+          # rust-fixes
+          # rust-dev
+
+          # next
+
+          # stable/linux-6.7.y
+          # stable-rc/linux-6.7.y
+
+          # stable/linux-6.6.y
+          # stable-rc/linux-6.6.y
+
+          # stable/linux-6.1.y
+          # stable-rc/linux-6.1.y
+
+        arch:
+          - x86_64
+          # arm64
+
+        toolchain:
+          # llvm
+          - rustc_codegen_gcc
+
+        config:
+          - defconfig
+          - defconfig+debug
+
+        output:
+          - src
+          # subdir
+          # outside
+
+        include:
+          # # `arch: arm64` (with `rust-dev`).
+          # - tree: rust-dev
+          #   arch: arm64
+          #   toolchain: rustc_codegen_gcc
+          #   config: defconfig
+          #   output: src
+          #
+          # # `arch: arm64` (with `rust-dev` + `defconfig+debug`).
+          # - tree: rust-dev
+          #   arch: arm64
+          #   toolchain: rustc_codegen_gcc
+          #   config: defconfig+debug
+          #   output: src
+
+          # `output: subdir`.
+          - tree: rust-next
+            arch: x86_64
+            toolchain: rustc_codegen_gcc
+            config: defconfig
+            output: subdir
+
+          # `output: outside`.
+          - tree: rust-next
+            arch: x86_64
+            toolchain: rustc_codegen_gcc
+            config: defconfig
+            output: outside
+
+        exclude:
+          # Rust 1.71.1 (in Linux 6.6) had a bug: it generated `.eh_frame` with debug assertions enabled.
+          - tree: stable/linux-6.6.y
+            config: defconfig+debug
+
+          # Rust 1.71.1 (in Linux 6.6) had a bug: it generated `.eh_frame` with debug assertions enabled.
+          - tree: stable-rc/linux-6.6.y
+            config: defconfig+debug
+
+    steps:
+      # Setup: variables.
+      - run: echo "JOBS=-j$(($(nproc) + 1))" >> $GITHUB_ENV
+
+      - if: matrix.arch == 'x86_64'
+        run: |
+          echo 'MAKE_ARCH=ARCH=x86_64' >> $GITHUB_ENV
+          echo 'IMAGE_PATH=arch/x86/boot/bzImage' >> $GITHUB_ENV
+          echo 'QEMU_ARCH=x86_64' >> $GITHUB_ENV
+          echo 'QEMU_ARGS=-append console=ttyS0' >> $GITHUB_ENV
+      - if: matrix.arch == 'arm64'
+        run: |
+          echo 'MAKE_ARCH=ARCH=arm64' >> $GITHUB_ENV
+          echo 'MAKE_CROSS_COMPILE=CROSS_COMPILE=aarch64-linux-gnu-' >> $GITHUB_ENV
+          echo 'IMAGE_PATH=arch/arm64/boot/Image.gz' >> $GITHUB_ENV
+          echo 'QEMU_ARCH=aarch64' >> $GITHUB_ENV
+          echo 'QEMU_ARGS=-machine virt' >> $GITHUB_ENV
+
+      - if: matrix.toolchain == 'llvm'
+        run: echo 'MAKE_TOOLCHAIN=LLVM=1' >> $GITHUB_ENV
+
+      - if: matrix.output == 'src'
+        run: |
+          echo 'OUTPUT_DIR=linux/' >> $GITHUB_ENV
+      - if: matrix.output == 'subdir'
+        run: |
+          echo 'MAKE_OUTPUT=O=subdir' >> $GITHUB_ENV
+          echo 'OUTPUT_DIR=linux/subdir/' >> $GITHUB_ENV
+      - if: matrix.output == 'outside'
+        run: |
+          echo 'MAKE_OUTPUT=O=/outside' >> $GITHUB_ENV
+          echo 'OUTPUT_DIR=/outside/' >> $GITHUB_ENV
+
+      # Setup: checkout Linux source tree.
+      - if: startsWith(matrix.tree, 'rust-')
+        run: git clone --depth 1 --branch ${{ matrix.tree }} https://github.com/Rust-for-Linux/linux.git linux
+      - if: startsWith(matrix.tree, 'next')
+        run: git clone --depth 1                             https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git linux
+      - if: startsWith(matrix.tree, 'stable/')
+        run: git clone --depth 1 --branch $(echo ${{ matrix.tree }} | cut -d/ -f2-) https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git linux
+      - if: startsWith(matrix.tree, 'stable-rc/')
+        run: git clone --depth 1 --branch $(echo ${{ matrix.tree }} | cut -d/ -f2-) https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git linux
+
+      - run: git -C linux show --no-patch
+
+      # Setup: checkout CI tree.
+      - uses: actions/checkout@v4
+        with:
+          path: ci
+
+      # Setup: Rust.
+      - run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
+            -y \
+            --no-modify-path \
+            --default-toolchain $(linux/scripts/min-tool-version.sh rustc) \
+            --profile minimal \
+            --component rust-src \
+            --component rustfmt \
+            --component clippy
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      # Setup: `rustc_codegen_gcc`.
+      - if: matrix.toolchain == 'rustc_codegen_gcc'
+        run: |
+          apt-get -y --no-install-recommends purge cpp gcc
+          curl --proto '=https' --tlsv1.2 -sSfLO https://github.com/antoyo/gcc/releases/download/master/gcc-13.deb
+          dpkg -i gcc-13.deb
+
+          git clone --depth 1 --branch $(linux/scripts/min-tool-version.sh rustc) https://github.com/rust-lang/rust.git rust-repo
+          # FIXME: 1.75.0 only: avoid `.eh_frame` error.
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
+          git -C rust-repo am ../ci/0001-Do-not-emit-.eh_frame-section-when-using-Cpanic-abor.patch
+
+          echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rust-repo/compiler/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
+
+          cd rust-repo/compiler/rustc_codegen_gcc
+          echo /usr/lib > gcc_path
+          sed -i '/channel/d' rust-toolchain
+          export RUSTC_BOOTSTRAP=1
+          ./y.sh prepare --only-libcore
+          ./y.sh build --release --features master
+
+      # Setup: `bindgen`.
+      #
+      # The `bindgen` package name is only used for 6.1 LTS.
+      - run: |
+          cargo install --locked --version $(linux/scripts/min-tool-version.sh bindgen) bindgen-cli ||
+            cargo install --locked --version $(linux/scripts/min-tool-version.sh bindgen) bindgen
+
+      # Setup: `busybox`.
+      - run: cp /root/busybox-${{ matrix.arch }} /root/busybox
+
+      # Prepare build output folder.
+      - if: matrix.output != 'src'
+        run: |
+          mkdir ${{ env.OUTPUT_DIR }}
+          sed -i 's:linux/samples/rust/:${{ env.OUTPUT_DIR }}samples/rust/:' ci/qemu-initramfs.desc
+
+      # Make sure Rust is available.
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rustavailable
+
+      # Configure kernel.
+      - run: cp ci/*.config linux/kernel/configs/
+
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} defconfig rfl-${{ matrix.arch }}.config rfl-rust.config
+
+      - if: matrix.config == 'defconfig+debug'
+        run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rfl-debug.config
+
+      # Dump kernel configuration before the build and save it.
+      - run: |
+          cat ${{ env.OUTPUT_DIR }}.config
+          cp ${{ env.OUTPUT_DIR }}.config config-before
+
+      # Build.
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }}
+
+      # Check the kernel configuration did not change, just in case.
+      - run: diff -u config-before ${{ env.OUTPUT_DIR }}.config
+
+      # Make sure certain key configs were enabled.
+      - run: |
+          grep -F 'CONFIG_RUST=y'   ${{ env.OUTPUT_DIR }}.config
+          grep -F 'CONFIG_WERROR=y' ${{ env.OUTPUT_DIR }}.config
+
+      # Prepare image.
+      - run: ${{ env.OUTPUT_DIR }}usr/gen_init_cpio ci/qemu-initramfs.desc > qemu-initramfs.img
+
+      # Run in QEMU.
+      - run: |
+          qemu-system-${{ env.QEMU_ARCH }} \
+            ${{ env.QEMU_ARGS }} \
+            -kernel ${{ env.OUTPUT_DIR }}${{ env.IMAGE_PATH }} \
+            -initrd qemu-initramfs.img \
+            -smp 2 \
+            -nographic \
+            -vga none \
+            -no-reboot \
+            | sed 's:\r$::' \
+            | tee qemu-stdout
+
+      # Report other data.
+      - run: |
+          ls -l
+
+          ls -l \
+            ${{ env.OUTPUT_DIR }}samples/rust/*.o \
+            ${{ env.OUTPUT_DIR }}samples/rust/*.ko \
+            ${{ env.OUTPUT_DIR }}rust/*.o \
+            ${{ env.OUTPUT_DIR }}vmlinux \
+            ${{ env.OUTPUT_DIR }}${{ env.IMAGE_PATH }}
+
+          ci/size.sh \
+            ${{ env.OUTPUT_DIR }}samples/rust/*.o \
+            ${{ env.OUTPUT_DIR }}samples/rust/*.ko \
+            ${{ env.OUTPUT_DIR }}rust/*.o \
+            ${{ env.OUTPUT_DIR }}vmlinux
+
+      # Check `.comment` section.
+      - if: matrix.toolchain == 'llvm'
+        run: |
+          if [ $(linux/scripts/min-tool-version.sh rustc | cut -d'.' -f2) -ge 73 ]; then
+            llvm-readelf --string-dump .comment ${{ env.OUTPUT_DIR }}rust/core.o
+            llvm-objcopy --dump-section .comment=comment ${{ env.OUTPUT_DIR }}rust/core.o
+            grep --text "^.rustc version $(linux/scripts/min-tool-version.sh rustc)" comment
+          else
+            echo 'Skipping since `rustc` < 1.73.0.'
+          fi
+      - if: matrix.toolchain == 'rustc_codegen_gcc'
+        run: |
+          llvm-readelf --string-dump .comment ${{ env.OUTPUT_DIR }}rust/core.o
+          llvm-objcopy --dump-section .comment=comment ${{ env.OUTPUT_DIR }}rust/core.o
+          # TODO: starting with Rust 1.76.0, we should check for the improved `.comment` section.
+          grep --text '^.GCC: ' comment
+
+      # Check QEMU log output.
+      - run: |
+          grep '] rust_minimal: Rust minimal sample (init)$'     qemu-stdout
+          grep '] rust_minimal: Am I built-in? false$'           qemu-stdout
+          grep '] rust_minimal: My numbers are \[72, 108, 200]$' qemu-stdout
+          grep '] rust_minimal: Rust minimal sample (exit)$'     qemu-stdout
+
+      # Linux 6.1 does not have `rust_print`.
+      - if: ${{ ! contains(matrix.tree, '6.1') }}
+        run: |
+          grep '] rust_print: Rust printing macros sample (init)$'       qemu-stdout
+
+          grep '] rust_print: Emergency message (level 0) without args$' qemu-stdout
+          grep '] rust_print: Alert message (level 1) without args$'     qemu-stdout
+          grep '] rust_print: Critical message (level 2) without args$'  qemu-stdout
+          grep '] rust_print: Error message (level 3) without args$'     qemu-stdout
+          grep '] rust_print: Warning message (level 4) without args$'   qemu-stdout
+          grep '] rust_print: Notice message (level 5) without args$'    qemu-stdout
+          grep '] rust_print: Info message (level 6) without args$'      qemu-stdout
+          grep '] rust_print: A line that is continued without args$'    qemu-stdout
+
+          grep '] rust_print: Emergency message (level 0) with args$'    qemu-stdout
+          grep '] rust_print: Alert message (level 1) with args$'        qemu-stdout
+          grep '] rust_print: Critical message (level 2) with args$'     qemu-stdout
+          grep '] rust_print: Error message (level 3) with args$'        qemu-stdout
+          grep '] rust_print: Warning message (level 4) with args$'      qemu-stdout
+          grep '] rust_print: Notice message (level 5) with args$'       qemu-stdout
+          grep '] rust_print: Info message (level 6) with args$'         qemu-stdout
+          grep '] rust_print: A line that is continued with args$'       qemu-stdout
+
+      # Linux 6.1 does not have KUnit `rustdoc` tests.
+      - if: ${{ matrix.config == 'defconfig+debug' && ! contains(matrix.tree, '6.1') }}
+        run: grep '] ok 1 rust_doctests_kernel$' qemu-stdout
+
+      - run: |
+          grep -i '\bpanic\b'     qemu-stdout && exit 1
+          grep -i '\boops\b'      qemu-stdout && exit 1
+          grep -i '\btaint\b'     qemu-stdout && exit 1
+          grep -i '\bfault\b'     qemu-stdout && exit 1
+          grep -i '\btrace\b'     qemu-stdout && exit 1
+          grep -i '\bcorrupted\b' qemu-stdout && exit 1
+
+          grep -i '\bbug\b'       qemu-stdout |
+              grep -Fv '" and report a bug' &&
+              exit 1
+
+          grep -i '\berror\b'     qemu-stdout |
+              grep -Fv 'message (level 3)' |
+              grep -Fv 'regulatory.db' &&
+              exit 1
+
+          grep -i '\bwarning\b'   qemu-stdout |
+              grep -Fv 'message (level 4)' &&
+              exit 1
+
+          exit 0
+
+      # Re-build with Clippy.
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} CLIPPY=1
+
+      # Generate Rust documentation.
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rustdoc
+
+      # Check `#[test]`s.
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rusttest
+
+      # Check formatting.
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rustfmtcheck
+
+      # Test single targets.
+      - run: |
+          rm ${{ env.OUTPUT_DIR }}samples/rust/rust_minimal.o
+          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.o
+          file ${{ env.OUTPUT_DIR }}samples/rust/rust_minimal.o | grep -F 'ELF'
+
+      # Rust 1.71.1 (in Linux 6.6) had a bug: it does not generate dependency files.
+      - if: ${{ ! contains(matrix.tree, '6.6') }}
+        run: |
+          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.rsi
+          grep -F '#![feature(prelude_import)]' ${{ env.OUTPUT_DIR }}samples/rust/rust_minimal.rsi
+
+      - run: |
+          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.s
+          grep -F '.text'                       ${{ env.OUTPUT_DIR }}samples/rust/rust_minimal.s
+
+      - if: matrix.toolchain == 'llvm'
+        run: |
+          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.ll
+          grep -F '; ModuleID'                  ${{ env.OUTPUT_DIR }}samples/rust/rust_minimal.ll
+
+      # Test Rust host programs.
+      - run: ${{ env.OUTPUT_DIR }}samples/rust/hostprogs/single | grep -F 'The number is 42.'
