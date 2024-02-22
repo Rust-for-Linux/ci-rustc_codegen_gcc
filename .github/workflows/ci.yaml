@@ -85,6 +85,9 @@ jobs:
             config: defconfig+debug
 
     steps:
+      # TODO: remove as this was added to test notifications.
+      - run: exit 1
+
       # Setup: variables.
       - run: echo "JOBS=-j$(($(nproc) + 1))" >> $GITHUB_ENV
 
