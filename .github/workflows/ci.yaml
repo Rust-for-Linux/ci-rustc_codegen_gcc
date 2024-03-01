@@ -154,10 +154,6 @@ jobs:
           dpkg -i gcc-13.deb
 
           git clone --depth 1 --branch $(linux/scripts/min-tool-version.sh rustc) https://github.com/rust-lang/rust.git rust-repo
-          # FIXME: 1.75.0 only: avoid `.eh_frame` error.
-          git config --global user.email "you@example.com"
-          git config --global user.name "Your Name"
-          git -C rust-repo am ../ci/0001-Do-not-emit-.eh_frame-section-when-using-Cpanic-abor.patch
 
           echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rust-repo/compiler/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
 
@@ -245,21 +241,18 @@ jobs:
             ${{ env.OUTPUT_DIR }}vmlinux
 
       # Check `.comment` section.
-      - if: matrix.toolchain == 'llvm'
-        run: |
+      - run: |
           if [ $(linux/scripts/min-tool-version.sh rustc | cut -d'.' -f2) -ge 73 ]; then
             llvm-readelf --string-dump .comment ${{ env.OUTPUT_DIR }}rust/core.o
             llvm-objcopy --dump-section .comment=comment ${{ env.OUTPUT_DIR }}rust/core.o
             grep --text "^.rustc version $(linux/scripts/min-tool-version.sh rustc)" comment
+            if ${{ matrix.toolchain == 'rustc_codegen_gcc' && 'true' || 'false' }}; then
+              grep --text 'libgccjit' comment
+              grep --text 'GCC: ' comment
+            fi
           else
             echo 'Skipping since `rustc` < 1.73.0.'
           fi
-      - if: matrix.toolchain == 'rustc_codegen_gcc'
-        run: |
-          llvm-readelf --string-dump .comment ${{ env.OUTPUT_DIR }}rust/core.o
-          llvm-objcopy --dump-section .comment=comment ${{ env.OUTPUT_DIR }}rust/core.o
-          # TODO: starting with Rust 1.76.0, we should check for the improved `.comment` section.
-          grep --text '^.GCC: ' comment
 
       # Check QEMU log output.
       - run: |
