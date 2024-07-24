@@ -150,7 +150,7 @@ jobs:
       - if: matrix.toolchain == 'rustc_codegen_gcc'
         run: |
           apt-get -y --no-install-recommends purge cpp gcc
-          curl --proto '=https' --tlsv1.2 -sSfLO https://github.com/antoyo/gcc/releases/download/master-6351b299c/gcc-13.deb
+          curl --proto '=https' --tlsv1.2 -sSfLO https://github.com/rust-lang/gcc/releases/latest/download/gcc-13.deb
           dpkg -i gcc-13.deb
 
           git clone --depth 1 --branch $(linux/scripts/min-tool-version.sh rustc) https://github.com/rust-lang/rust.git rust-repo
@@ -158,7 +158,7 @@ jobs:
           echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rust-repo/compiler/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
 
           cd rust-repo/compiler/rustc_codegen_gcc
-          echo /usr/lib > gcc_path
+          echo 'gcc-path = "/usr/lib"' > config.toml
           sed -i '/channel/d' rust-toolchain
           export RUSTC_BOOTSTRAP=1
           ./y.sh prepare --only-libcore
