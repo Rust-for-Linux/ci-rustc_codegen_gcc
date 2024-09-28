@@ -84,6 +84,8 @@ jobs:
           - tree: stable-rc/linux-6.6.y
             config: defconfig+debug
 
+    env:
+      RUST_VERSION: nightly-2024-08-11
     steps:
       # Setup: variables.
       - run: echo "JOBS=-j$(($(nproc) + 1))" >> $GITHUB_ENV
@@ -139,7 +141,7 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
             -y \
             --no-modify-path \
-            --default-toolchain $(linux/scripts/min-tool-version.sh rustc) \
+            --default-toolchain $RUST_VERSION \
             --profile minimal \
             --component rust-src \
             --component rustfmt \
@@ -153,23 +155,23 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSfLO https://github.com/rust-lang/gcc/releases/latest/download/gcc-13.deb
           dpkg -i gcc-13.deb
 
-          git clone --depth 1 --branch $(linux/scripts/min-tool-version.sh rustc) https://github.com/rust-lang/rust.git rust-repo
+          git clone --depth 1 https://github.com/rust-lang/rustc_codegen_gcc
 
-          echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rust-repo/compiler/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
+          echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
 
-          cd rust-repo/compiler/rustc_codegen_gcc
+          cd rustc_codegen_gcc
           echo 'gcc-path = "/usr/lib"' > config.toml
-          sed -i '/channel/d' rust-toolchain
+          #sed -i '/channel/d' rust-toolchain
           export RUSTC_BOOTSTRAP=1
           ./y.sh prepare --only-libcore
-          ./y.sh build --release --features master
+          ./y.sh build --sysroot --release
 
       # Setup: `bindgen`.
       #
       # The `bindgen` package name is only used for 6.1 LTS.
       - run: |
-          cargo install --locked --version $(linux/scripts/min-tool-version.sh bindgen) bindgen-cli ||
-            cargo install --locked --version $(linux/scripts/min-tool-version.sh bindgen) bindgen
+          cargo install --locked --version 0.70.1 bindgen-cli ||
+            cargo install --locked --version 0.70.1 bindgen
 
       # Setup: `busybox`.
       - run: cp /root/busybox-${{ matrix.arch }} /root/busybox
@@ -242,9 +244,11 @@ jobs:
 
       # Check `.comment` section.
       - run: |
+          # TODO: update version here.
           if [ $(linux/scripts/min-tool-version.sh rustc | cut -d'.' -f2) -ge 73 ]; then
             llvm-readelf --string-dump .comment ${{ env.OUTPUT_DIR }}rust/core.o
             llvm-objcopy --dump-section .comment=comment ${{ env.OUTPUT_DIR }}rust/core.o
+            # TODO: update version here.
             grep --text "^.rustc version $(linux/scripts/min-tool-version.sh rustc)" comment
             if ${{ matrix.toolchain == 'rustc_codegen_gcc' && 'true' || 'false' }}; then
               grep --text 'libgccjit' comment
