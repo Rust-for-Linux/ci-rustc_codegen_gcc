@@ -85,7 +85,7 @@ jobs:
             config: defconfig+debug
 
     env:
-      RUST_VERSION: nightly-2024-08-11
+      RUST_VERSION: nightly-2025-01-12
     steps:
       # Setup: variables.
       - run: echo "JOBS=-j$(($(nproc) + 1))" >> $GITHUB_ENV
