@@ -152,8 +152,8 @@ jobs:
       - if: matrix.toolchain == 'rustc_codegen_gcc'
         run: |
           apt-get -y --no-install-recommends purge cpp gcc
-          curl --proto '=https' --tlsv1.2 -sSfLO https://github.com/rust-lang/gcc/releases/latest/download/gcc-13.deb
-          dpkg -i gcc-13.deb
+          curl --proto '=https' --tlsv1.2 -sSfLO https://github.com/rust-lang/gcc/releases/latest/download/gcc-15.deb
+          dpkg -i gcc-15.deb
 
           git clone --depth 1 https://github.com/rust-lang/rustc_codegen_gcc
 
