@@ -3,7 +3,7 @@ dir     /sys                                                           0755 0 0
 dir     /dev                                                           0755 0 0
 file    /init                      ci/qemu-init.sh                     0755 0 0
 
-file    /bin/busybox               /root/busybox                       0755 0 0
+file    /bin/busybox               busybox/busybox                     0755 0 0
 slink   /bin/sh                    /bin/busybox                        0755 0 0
 
 file    /rust_minimal.ko           linux/samples/rust/rust_minimal.ko  0755 0 0
