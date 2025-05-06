@@ -114,6 +114,11 @@ jobs:
 
           git clone --depth 1 https://github.com/rust-lang/rustc_codegen_gcc
 
+          # Since we use rustc_codegen_gcc from the master branch of the repo, but don't use y.sh in make to build using rustc_codegen_gcc,
+          # we need to override the rust version.
+          rust_version=$(grep channel rustc_codegen_gcc/rust-toolchain | cut -f3 -d' ' | sed 's/"//g')
+          rustup override set $rust_version
+
           echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
 
 
