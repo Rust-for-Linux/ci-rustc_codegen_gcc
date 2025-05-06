@@ -230,7 +230,7 @@ jobs:
           grep '] rust_print: Info message (level 6) with args$'         qemu-stdout
           grep '] rust_print: A line that is continued with args$'       qemu-stdout
 
-      - run: grep '] ok 1 rust_doctests_kernel$' qemu-stdout
+      - run: grep '] ok 2 rust_doctests_kernel$' qemu-stdout
 
       - run: |
           grep -i '\bpanic\b'     qemu-stdout && exit 1
