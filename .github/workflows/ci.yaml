@@ -115,6 +115,7 @@ jobs:
 
           echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
 
+
           cd rustc_codegen_gcc
           echo 'gcc-path = "/usr/lib"' > config.toml
           #sed -i '/channel/d' rust-toolchain
