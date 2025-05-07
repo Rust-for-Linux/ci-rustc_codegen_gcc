@@ -118,6 +118,7 @@ jobs:
           # we need to override the rust version.
           rust_version=$(grep channel rustc_codegen_gcc/rust-toolchain | cut -f3 -d' ' | sed 's/"//g')
           rustup override set $rust_version
+          rustup component add clippy rustfmt
 
           echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
 
