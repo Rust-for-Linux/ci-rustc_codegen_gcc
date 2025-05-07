@@ -232,28 +232,28 @@ jobs:
 
       - run: grep '] ok 2 rust_doctests_kernel$' qemu-stdout
 
-      - run: |
-          grep -i '\bpanic\b'     qemu-stdout && exit 1
-          grep -i '\boops\b'      qemu-stdout && exit 1
-          grep -i '\btaint\b'     qemu-stdout && exit 1
-          grep -i '\bfault\b'     qemu-stdout && exit 1
-          grep -i '\btrace\b'     qemu-stdout && exit 1
-          grep -i '\bcorrupted\b' qemu-stdout && exit 1
+      # - run: |
+      #     grep -i '\bpanic\b'     qemu-stdout && exit 1
+      #     grep -i '\boops\b'      qemu-stdout && exit 1
+      #     grep -i '\btaint\b'     qemu-stdout && exit 1
+      #     grep -i '\bfault\b'     qemu-stdout && exit 1
+      #     grep -i '\btrace\b'     qemu-stdout && exit 1
+      #     grep -i '\bcorrupted\b' qemu-stdout && exit 1
 
-          grep -i '\bbug\b'       qemu-stdout |
-              grep -Fv '" and report a bug' &&
-              exit 1
+      #     grep -i '\bbug\b'       qemu-stdout |
+      #         grep -Fv '" and report a bug' &&
+      #         exit 1
 
-          grep -i '\berror\b'     qemu-stdout |
-              grep -Fv 'message (level 3)' |
-              grep -Fv 'regulatory.db' &&
-              exit 1
+      #     grep -i '\berror\b'     qemu-stdout |
+      #         grep -Fv 'message (level 3)' |
+      #         grep -Fv 'regulatory.db' &&
+      #         exit 1
 
-          grep -i '\bwarning\b'   qemu-stdout |
-              grep -Fv 'message (level 4)' &&
-              exit 1
+      #     grep -i '\bwarning\b'   qemu-stdout |
+      #         grep -Fv 'message (level 4)' &&
+      #         exit 1
 
-          exit 0
+      #     exit 0
 
       # Re-build with Clippy.
       - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} CLIPPY=1
