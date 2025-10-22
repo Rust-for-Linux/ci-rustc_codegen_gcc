@@ -27,6 +27,10 @@ jobs:
           - defconfig
           - defconfig+debug
 
+        backend:
+          - gcc
+          - llvm
+
         output:
           - src
           # subdir
@@ -108,7 +112,8 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       # Setup: `rustc_codegen_gcc`.
-      - run: |
+      - if: matrix.backend == 'gcc'
+        run: |
           sudo apt-get -y --no-install-recommends purge cpp gcc
           curl --proto '=https' --tlsv1.2 -sSfLO https://github.com/rust-lang/gcc/releases/latest/download/gcc-15.deb
           sudo dpkg -i gcc-15.deb
@@ -122,7 +127,6 @@ jobs:
           rustup component add clippy rustfmt
 
           echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
-
 
           cd rustc_codegen_gcc
           echo 'gcc-path = "/usr/lib"' > config.toml
@@ -181,12 +185,19 @@ jobs:
             ${{ env.OUTPUT_DIR }}vmlinux
 
       # Check `.comment` section.
-      - run: |
+      - if: matrix.backend == 'gcc'
+        run: |
           readelf --string-dump .comment ${{ env.OUTPUT_DIR }}rust/core.o
           objcopy --dump-section .comment=comment ${{ env.OUTPUT_DIR }}rust/core.o
           grep --text "^.rustc version .* with libgccjit" comment
           grep --text 'libgccjit' comment
           grep --text 'GCC: ' comment
+
+      - if: matrix.backend == 'llvm'
+        run: |
+          readelf --string-dump .comment ${{ env.OUTPUT_DIR }}rust/core.o
+          objcopy --dump-section .comment=comment ${{ env.OUTPUT_DIR }}rust/core.o
+          grep --text "^.rustc version" comment
 
       # Prepare image.
       - run: ${{ env.OUTPUT_DIR }}usr/gen_init_cpio ci/qemu-initramfs.desc > qemu-initramfs.img
