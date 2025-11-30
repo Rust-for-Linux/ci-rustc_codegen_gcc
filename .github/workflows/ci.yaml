@@ -128,6 +128,10 @@ jobs:
 
           echo "MAKE_KRUSTFLAGS=KRUSTFLAGS=-Zcodegen-backend=$(pwd)/rustc_codegen_gcc/target/release/librustc_codegen_gcc.so" >> $GITHUB_ENV
 
+          # Since the Makefile uses the sysroot provided by rustup, we need to
+          # manually copy libgccjit.so in this sysroot directory.
+          ln -s /usr/lib/libgccjit.so ~/.rustup/toolchains/$rust_version-x86_64-unknown-linux-gnu/lib/
+
           cd rustc_codegen_gcc
           echo 'gcc-path = "/usr/lib"' > config.toml
           #sed -i '/channel/d' rust-toolchain
