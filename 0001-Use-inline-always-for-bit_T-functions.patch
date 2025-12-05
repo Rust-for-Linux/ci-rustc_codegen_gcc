@@ -1,0 +1,25 @@
+From 826b2b4116d7d204132a2ec1afd2fcb57061994c Mon Sep 17 00:00:00 2001
+From: Antoni Boucher <bouanto@zoho.com>
+Date: Fri, 5 Dec 2025 07:51:25 -0500
+Subject: [PATCH] Use #[inline(always)] for bit_T functions
+
+---
+ rust/kernel/bits.rs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rust/kernel/bits.rs b/rust/kernel/bits.rs
+index 553d50265883..d39aed20bc6f 100644
+--- a/rust/kernel/bits.rs
++++ b/rust/kernel/bits.rs
+@@ -27,7 +27,7 @@ pub fn [<checked_bit_ $ty>](n: u32) -> Option<$ty> {
+             ///
+             /// This version is the default and should be used if `n` is known at
+             /// compile time.
+-            #[inline]
++            #[inline(always)]
+             pub const fn [<bit_ $ty>](n: u32) -> $ty {
+                 build_assert!(n < <$ty>::BITS);
+                 (1 as $ty) << n
+-- 
+2.52.0
+

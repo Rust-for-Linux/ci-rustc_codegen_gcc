@@ -93,6 +93,9 @@ jobs:
       # TODO: remove if this patch is indeed not necessary. (It seems the patch is now included upstream.)
       # - run: git -C linux apply ../ci/x86-boot-Use-std-gnu11-to-fix-build-with-GCC-15.patch
 
+      # TODO: remove when fixed in the above branch.
+      - run: git -C linux apply ../ci/0001-Use-inline-always-for-bit_T-functions.patch
+
       # Setup: `busybox`.
       - run: |
           git clone --depth 1 -b 1_30_1 https://git.busybox.net/busybox/
