@@ -1,0 +1,26 @@
+From 669e0e3d10ce44a257cd53bff6b84aa8a7ee847c Mon Sep 17 00:00:00 2001
+From: Antoni Boucher <bouanto@zoho.com>
+Date: Tue, 9 Dec 2025 08:13:47 -0500
+Subject: [PATCH] Skip GCC flag for bindgen
+
+---
+ rust/Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/rust/Makefile b/rust/Makefile
+index 5d357dce1..e077f4515 100644
+--- a/rust/Makefile
++++ b/rust/Makefile
+@@ -383,7 +383,8 @@ bindgen_skip_c_flags := -mno-fp-ret-in-387 -mpreferred-stack-boundary=% \
+ 	-fno-inline-functions-called-once -fsanitize=bounds-strict \
+ 	-fstrict-flex-arrays=% -fmin-function-alignment=% \
+ 	-fzero-init-padding-bits=% -mno-fdpic \
+-	--param=% --param asan-% -fno-isolate-erroneous-paths-dereference
++	--param=% --param asan-% -fno-isolate-erroneous-paths-dereference \
++	-fdiagnostics-show-context=2
+ 
+ # Derived from `scripts/Makefile.clang`.
+ BINDGEN_TARGET_x86	:= x86_64-linux-gnu
+-- 
+2.52.0
+
