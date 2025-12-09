@@ -94,7 +94,10 @@ jobs:
       # - run: git -C linux apply ../ci/x86-boot-Use-std-gnu11-to-fix-build-with-GCC-15.patch
 
       # TODO: remove when fixed in the above branch.
-      - run: git -C linux apply ../ci/0001-Use-inline-always-for-bit_T-functions.patch
+      - run: git -C linux apply ../ci/patches/0001-Use-inline-always-for-bit_T-functions.patch
+
+      # TODO: remove when fixed in the above branch.
+      - run: git -C linux apply ../ci/patches/0001-Skip-GCC-flag-for-bindgen.patch
 
       # Setup: `busybox`.
       - run: |
