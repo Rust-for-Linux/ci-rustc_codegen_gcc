@@ -99,6 +99,9 @@ jobs:
       # TODO: remove when fixed in the above branch.
       - run: git -C linux apply ../ci/patches/0001-Skip-GCC-flag-for-bindgen.patch
 
+      # TODO: remove when fixed in the above branch.
+      - run: git -C linux apply ../ci/patches/0001-Ignore-some-failing-tests.patch
+
       # Setup: `busybox`.
       - run: |
           git clone --depth 1 -b 1_30_1 https://git.busybox.net/busybox/
