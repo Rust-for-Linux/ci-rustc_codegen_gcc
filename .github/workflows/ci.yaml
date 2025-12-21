@@ -133,7 +133,11 @@ jobs:
 
           # Since the Makefile uses the sysroot provided by rustup, we need to
           # manually copy libgccjit.so in this sysroot directory.
-          ln -s /usr/lib/libgccjit.so ~/.rustup/toolchains/$rust_version-x86_64-unknown-linux-gnu/lib/
+          dir1=~/.rustup/toolchains/$rust_version-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/codegen-backends/lib/x86_64-linux-gnu/
+          dir2=~/.rustup/toolchains/$rust_version-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/codegen-backends/lib/x86_64-unknown-linux-gnu/
+          mkdir -p $dir1 $dir2
+          ln -s /usr/lib/libgccjit.so $dir1/libgccjit.so
+          ln -s /usr/lib/libgccjit.so $dir2/libgccjit.so
 
           cd rustc_codegen_gcc
           echo 'gcc-path = "/usr/lib"' > config.toml
