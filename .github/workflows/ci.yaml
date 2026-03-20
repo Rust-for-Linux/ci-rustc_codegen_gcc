@@ -95,7 +95,7 @@ jobs:
 
       # Setup: `busybox`.
       - run: |
-          git clone --depth 1 -b 1_30_1 https://git.busybox.net/busybox/
+          git clone --depth 1 -b 1_30_1 https://github.com/mirror/busybox
           mv ci/busybox.config busybox/.config
           make -C busybox ${{ env.MAKE_CROSS_COMPILE }} ${{ env.JOBS }} busybox
 
