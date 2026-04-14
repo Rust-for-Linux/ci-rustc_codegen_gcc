@@ -144,7 +144,7 @@ jobs:
           ./y.sh build --sysroot --release
 
       # Setup: `bindgen`.
-      - run: cargo install --locked --version 0.70.1 bindgen-cli
+      - run: cargo install --locked --version 0.71.1 bindgen-cli
 
       # Prepare build output folder.
       - if: matrix.output != 'src'
