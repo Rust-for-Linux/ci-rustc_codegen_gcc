@@ -93,6 +93,12 @@ jobs:
       # TODO: remove if this patch is indeed not necessary. (It seems the patch is now included upstream.)
       # - run: git -C linux apply ../ci/x86-boot-Use-std-gnu11-to-fix-build-with-GCC-15.patch
 
+      # TODO: remove when fixed upstream.
+      - run: git -C linux apply ../ci/0001-Use-inline-always-for-bitfield-test-conversions.patch
+
+      # TODO: remove when fixed upstream.
+      - run: git -C linux apply ../ci/0002-Path-qualify-zerocopy-extern-in-rusttestlib-kernel.patch
+
       # Setup: `busybox`.
       - run: |
           git clone --depth 1 -b 1_30_1 https://github.com/mirror/busybox
@@ -254,7 +260,11 @@ jobs:
           grep '] rust_print: Info message (level 6) with args$'         qemu-stdout
           grep '] rust_print: A line that is continued with args$'       qemu-stdout
 
-      - run: grep '] ok 7 rust_doctests_kernel$' qemu-stdout
+      - run: |
+          # Print the result line for debugging.
+          grep -E '\] ok [0-9]+ rust_doctests_kernel$' qemu-stdout || true
+
+          grep '] ok 8 rust_doctests_kernel$' qemu-stdout
 
       - run: python ci/check_panics.py qemu-stdout
 

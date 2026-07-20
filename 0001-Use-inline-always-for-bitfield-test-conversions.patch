@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Antoni Boucher <bouanto@zoho.com>
+Date: Mon, 20 Jul 2026 00:00:00 -0500
+Subject: [PATCH] Use #[inline(always)] for bitfield test conversions
+
+The `From<MemoryType>`/`From<Priority>` impls in the `bitfield` KUnit
+tests forward to `Bounded::from_expr`, which uses `build_assert!`. That
+assertion is meant to be optimized out on the (statically valid) success
+path. rustc_codegen_gcc only manages to fold it away once the constant
+enum values from the test bodies are visible, which requires the whole
+call chain to be inlined. The generated `bitfield!` setters and
+`from_expr` are already `#[inline(always)]`; these two `From` impls are
+the only remaining out-of-line links, so an out-of-line copy carrying an
+un-eliminated call to `rust_build_error` is emitted and the vmlinux link
+fails with `undefined reference to rust_build_error`.
+
+Force-inlining these conversions lets the constants reach `build_assert!`
+so the branch is folded away, matching the codegen LLVM already produces.
+---
+ rust/kernel/bitfield.rs | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/rust/kernel/bitfield.rs b/rust/kernel/bitfield.rs
+--- a/rust/kernel/bitfield.rs
++++ b/rust/kernel/bitfield.rs
+@@ -581,6 +581,7 @@
+     }
+
+     impl From<MemoryType> for Bounded<u64, 4> {
++        #[inline(always)]
+         fn from(mt: MemoryType) -> Bounded<u64, 4> {
+             Bounded::from_expr(mt as u64)
+         }
+@@ -606,6 +607,7 @@
+     }
+
+     impl From<Priority> for Bounded<u16, 2> {
++        #[inline(always)]
+         fn from(p: Priority) -> Bounded<u16, 2> {
+             Bounded::from_expr(p as u16)
+         }

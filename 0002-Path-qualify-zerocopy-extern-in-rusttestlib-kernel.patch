@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Antoni Boucher <bouanto@zoho.com>
+Date: Mon, 20 Jul 2026 00:00:00 -0500
+Subject: [PATCH] rust: path-qualify the zerocopy extern in rusttestlib-kernel
+
+Since nightly-2025-11-23 the Rust sysroot ships a precompiled `zerocopy`
+crate (`libzerocopy-<hash>.rmeta`). `rusttestlib-kernel` builds the kernel
+crate as a host test library with a bare `--extern zerocopy` and
+`-L rust/test`, so rustc finds two candidates for the crate -- the
+in-tree `rust/test/libzerocopy.rlib` and the sysroot one -- and fails:
+
+    error[E0464]: multiple candidates for `rmeta` dependency `zerocopy` found
+
+The other rules that name `zerocopy` are unaffected: the rustdoc/doctest
+rules pass `--sysroot=/dev/null`, and `rusttest-macros` only pulls
+`zerocopy` in transitively through `--extern kernel`, which rustc
+resolves unambiguously by crate hash.
+
+Point the direct dependency at the in-tree rlib so the sysroot copy is
+never considered. This only shows up with a recent toolchain, which the
+GCC backend uses (rustc_codegen_gcc pins nightly-2026-07-14); the LLVM
+backend still builds against an older nightly without the sysroot crate.
+---
+ rust/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rust/Makefile b/rust/Makefile
+--- a/rust/Makefile
++++ b/rust/Makefile
+@@ -342,7 +342,7 @@ rusttestlib-pin_init: $(src)/pin-init/src/lib.rs rusttestlib-macros \
+ rusttestlib-kernel: private rustc_target_flags = --extern ffi \
+     --extern build_error --extern macros --extern pin_init \
+     --extern bindings --extern uapi \
+-    --extern zerocopy --extern zerocopy_derive
++    --extern zerocopy=$(objtree)/$(obj)/test/libzerocopy.rlib --extern zerocopy_derive
+ rusttestlib-kernel: $(src)/kernel/lib.rs rusttestlib-bindings rusttestlib-uapi \
+     rusttestlib-build_error rusttestlib-pin_init $(obj)/$(libmacros_name) \
+     $(obj)/bindings.o rusttestlib-zerocopy rusttestlib-zerocopy_derive FORCE
