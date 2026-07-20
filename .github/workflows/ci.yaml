@@ -93,6 +93,8 @@ jobs:
       # TODO: remove if this patch is indeed not necessary. (It seems the patch is now included upstream.)
       # - run: git -C linux apply ../ci/x86-boot-Use-std-gnu11-to-fix-build-with-GCC-15.patch
 
+      - run: git -C linux apply ../ci/0001-Use-inline-always-for-bitfield-test-conversions.patch
+
       # Setup: `busybox`.
       - run: |
           git clone --depth 1 -b 1_30_1 https://github.com/mirror/busybox
