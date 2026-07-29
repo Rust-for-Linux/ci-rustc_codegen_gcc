@@ -94,7 +94,7 @@ jobs:
       # - run: git -C linux apply ../ci/x86-boot-Use-std-gnu11-to-fix-build-with-GCC-15.patch
 
       # TODO: remove when fixed upstream.
-      - run: git -C linux apply ../ci/0001-Use-inline-always-for-bitfield-test-conversions.patch
+      # - run: git -C linux apply ../ci/0001-Use-inline-always-for-bitfield-test-conversions.patch
 
       # TODO: remove when fixed upstream.
       - run: git -C linux apply ../ci/0002-Path-qualify-zerocopy-extern-in-rusttestlib-kernel.patch
