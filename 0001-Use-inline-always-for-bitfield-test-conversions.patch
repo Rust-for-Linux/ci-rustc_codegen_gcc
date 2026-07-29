@@ -27,7 +27,7 @@ diff --git a/rust/kernel/bitfield.rs b/rust/kernel/bitfield.rs
      }
 
      impl From<MemoryType> for Bounded<u64, 4> {
-+        #[inline(always)]
++        #[inline]
          fn from(mt: MemoryType) -> Bounded<u64, 4> {
              Bounded::from_expr(mt as u64)
          }
@@ -35,7 +35,7 @@ diff --git a/rust/kernel/bitfield.rs b/rust/kernel/bitfield.rs
      }
 
      impl From<Priority> for Bounded<u16, 2> {
-+        #[inline(always)]
++        #[inline]
          fn from(p: Priority) -> Bounded<u16, 2> {
              Bounded::from_expr(p as u16)
          }
