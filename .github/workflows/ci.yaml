@@ -258,7 +258,7 @@ jobs:
           # Print the result line for debugging.
           grep -E '\] ok [0-9]+ rust_doctests_kernel$' qemu-stdout || true
 
-          grep '] ok 8 rust_doctests_kernel$' qemu-stdout
+          grep '] ok 11 rust_doctests_kernel$' qemu-stdout
 
       - run: python ci/check_panics.py qemu-stdout
 
