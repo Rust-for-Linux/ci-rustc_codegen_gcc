@@ -7,9 +7,9 @@ on:
 
 jobs:
   ci:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
 
-    timeout-minutes: 70
+    timeout-minutes: ${{ matrix.arch == 'arm64' && 150 || 70 }}
 
     strategy:
       fail-fast: false
@@ -21,7 +21,7 @@ jobs:
 
         arch:
           - x86_64
-          # arm64
+          - arm64
 
         config:
           - defconfig
@@ -48,13 +48,14 @@ jobs:
           echo 'IMAGE_PATH=arch/x86/boot/bzImage' >> $GITHUB_ENV
           echo 'QEMU_ARCH=x86_64' >> $GITHUB_ENV
           echo 'QEMU_ARGS=-append console=ttyS0' >> $GITHUB_ENV
+          echo 'GCC_DEB=gcc-15.deb' >> $GITHUB_ENV
       - if: matrix.arch == 'arm64'
         run: |
           echo 'MAKE_ARCH=ARCH=arm64' >> $GITHUB_ENV
-          echo 'MAKE_CROSS_COMPILE=CROSS_COMPILE=aarch64-linux-gnu-' >> $GITHUB_ENV
           echo 'IMAGE_PATH=arch/arm64/boot/Image.gz' >> $GITHUB_ENV
           echo 'QEMU_ARCH=aarch64' >> $GITHUB_ENV
-          echo 'QEMU_ARGS=-machine virt' >> $GITHUB_ENV
+          echo 'QEMU_ARGS=-machine virt -cpu cortex-a72' >> $GITHUB_ENV
+          echo 'GCC_DEB=gcc-15-aarch64.deb' >> $GITHUB_ENV
 
       - if: matrix.output == 'src'
         run: |
@@ -71,9 +72,6 @@ jobs:
       - run: |
           sudo apt-get -y update
           sudo apt-get -y --no-install-recommends install bc file git make flex bison libelf-dev libssl-dev curl python3 llvm clang lld binutils qemu-system-x86 qemu-system-arm
-
-      - if: matrix.arch == 'arm64'
-        run: sudo apt-get -y --no-install-recommends install gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
       # Setup: checkout Linux source tree.
       - if: matrix.tree == 'torvalds'
@@ -118,8 +116,8 @@ jobs:
           sudo apt-get install clang-19
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 190
 
-          curl --proto '=https' --tlsv1.2 -sSfLO https://github.com/rust-lang/gcc/releases/latest/download/gcc-15.deb
-          sudo dpkg -i gcc-15.deb
+          curl --proto '=https' --tlsv1.2 -sSfLO https://github.com/rust-lang/gcc/releases/latest/download/$GCC_DEB
+          sudo dpkg -i $GCC_DEB
 
           git clone --depth 1 https://github.com/rust-lang/rustc_codegen_gcc
 
@@ -133,8 +131,9 @@ jobs:
 
           # Since the Makefile uses the sysroot provided by rustup, we need to
           # manually copy libgccjit.so in this sysroot directory.
-          dir1=~/.rustup/toolchains/$rust_version-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/codegen-backends/lib/x86_64-linux-gnu/
-          dir2=~/.rustup/toolchains/$rust_version-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/codegen-backends/lib/x86_64-unknown-linux-gnu/
+          host_arch=$(uname -m)
+          dir1=~/.rustup/toolchains/$rust_version-$host_arch-unknown-linux-gnu/lib/rustlib/$host_arch-unknown-linux-gnu/codegen-backends/lib/$host_arch-linux-gnu/
+          dir2=~/.rustup/toolchains/$rust_version-$host_arch-unknown-linux-gnu/lib/rustlib/$host_arch-unknown-linux-gnu/codegen-backends/lib/$host_arch-unknown-linux-gnu/
           mkdir -p $dir1 $dir2
           ln -s /usr/lib/libgccjit.so $dir1/libgccjit.so
           ln -s /usr/lib/libgccjit.so $dir2/libgccjit.so
