@@ -56,7 +56,7 @@ jobs:
           echo 'MAKE_ARCH=ARCH=arm64' >> $GITHUB_ENV
           echo 'IMAGE_PATH=arch/arm64/boot/Image.gz' >> $GITHUB_ENV
           echo 'QEMU_ARCH=aarch64' >> $GITHUB_ENV
-          echo 'QEMU_PACKAGE=qemu-system-arm' >> $GITHUB_ENV
+          echo 'QEMU_PACKAGE=qemu-system-arm ipxe-qemu' >> $GITHUB_ENV
           echo 'QEMU_ARGS=-machine virt -cpu cortex-a72' >> $GITHUB_ENV
           echo 'GCC_DEB=gcc-15-aarch64.deb' >> $GITHUB_ENV
           echo 'LIBGCCJIT_TARGETS=aarch64-unknown-linux-gnu aarch64-unknown-none-softfloat' >> $GITHUB_ENV
@@ -166,6 +166,9 @@ jobs:
       - run: cp ci/*.config linux/kernel/configs/
 
       - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} defconfig rfl-${{ matrix.arch }}.config rfl-rust.config
+
+      - if: matrix.arch == 'arm64' && matrix.backend == 'gcc'
+        run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rfl-arm64-gcc.config
 
       - if: matrix.config == 'defconfig+debug'
         run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rfl-debug.config
