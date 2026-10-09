@@ -47,6 +47,7 @@ jobs:
           echo 'MAKE_ARCH=ARCH=x86_64' >> $GITHUB_ENV
           echo 'IMAGE_PATH=arch/x86/boot/bzImage' >> $GITHUB_ENV
           echo 'QEMU_ARCH=x86_64' >> $GITHUB_ENV
+          echo 'QEMU_PACKAGE=qemu-system-x86' >> $GITHUB_ENV
           echo 'QEMU_ARGS=-append console=ttyS0' >> $GITHUB_ENV
           echo 'GCC_DEB=gcc-15.deb' >> $GITHUB_ENV
           echo 'LIBGCCJIT_TARGETS=x86_64-linux-gnu x86_64-unknown-linux-gnu' >> $GITHUB_ENV
@@ -55,6 +56,7 @@ jobs:
           echo 'MAKE_ARCH=ARCH=arm64' >> $GITHUB_ENV
           echo 'IMAGE_PATH=arch/arm64/boot/Image.gz' >> $GITHUB_ENV
           echo 'QEMU_ARCH=aarch64' >> $GITHUB_ENV
+          echo 'QEMU_PACKAGE=qemu-system-arm ipxe-qemu' >> $GITHUB_ENV
           echo 'QEMU_ARGS=-machine virt -cpu cortex-a72' >> $GITHUB_ENV
           echo 'GCC_DEB=gcc-15-aarch64.deb' >> $GITHUB_ENV
           echo 'LIBGCCJIT_TARGETS=aarch64-unknown-linux-gnu aarch64-unknown-none-softfloat' >> $GITHUB_ENV
@@ -73,7 +75,7 @@ jobs:
 
       - run: |
           sudo apt-get -y update
-          sudo apt-get -y --no-install-recommends install bc file git make flex bison libelf-dev libssl-dev curl python3 llvm clang lld binutils qemu-system-x86 qemu-system-arm
+          sudo apt-get -y --no-install-recommends install bc file git make flex bison libelf-dev libssl-dev curl python3 llvm clang lld binutils $QEMU_PACKAGE
 
       # Setup: checkout Linux source tree.
       - if: matrix.tree == 'torvalds'
@@ -97,7 +99,7 @@ jobs:
       - run: |
           git clone --depth 1 -b 1_30_1 https://github.com/mirror/busybox
           mv ci/busybox.config busybox/.config
-          make -C busybox ${{ env.MAKE_CROSS_COMPILE }} ${{ env.JOBS }} busybox
+          make -C busybox ${{ env.JOBS }} busybox
 
       # Setup: Rust.
       - run: |
@@ -158,15 +160,18 @@ jobs:
           sed -i 's:linux/samples/rust/:${{ env.OUTPUT_DIR }}samples/rust/:' ci/qemu-initramfs.desc
 
       # Make sure Rust is available.
-      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rustavailable
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rustavailable
 
       # Configure kernel.
       - run: cp ci/*.config linux/kernel/configs/
 
-      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} defconfig rfl-${{ matrix.arch }}.config rfl-rust.config
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} defconfig rfl-${{ matrix.arch }}.config rfl-rust.config
+
+      - if: matrix.arch == 'arm64' && matrix.backend == 'gcc'
+        run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rfl-arm64-gcc.config
 
       - if: matrix.config == 'defconfig+debug'
-        run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rfl-debug.config
+        run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rfl-debug.config
 
       # Dump kernel configuration before the build and save it.
       - run: |
@@ -174,7 +179,7 @@ jobs:
           cp ${{ env.OUTPUT_DIR }}.config config-before
 
       # Build.
-      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }}
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }}
 
       # Check the kernel configuration did not change, just in case.
       - run: diff -u config-before ${{ env.OUTPUT_DIR }}.config
@@ -265,30 +270,30 @@ jobs:
       - run: python ci/check_panics.py qemu-stdout
 
       # Re-build with Clippy.
-      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} CLIPPY=1
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} CLIPPY=1
 
       # Generate Rust documentation.
-      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rustdoc
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rustdoc
 
       # Check `#[test]`s.
-      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rusttest
+      - run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rusttest
 
       # Check formatting.
       # TODO: re-enable when fixed upstream.
-      #- run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rustfmtcheck
+      #- run: make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} rustfmtcheck
 
       # Test single targets.
       - run: |
           rm ${{ env.OUTPUT_DIR }}samples/rust/rust_minimal.o
-          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.o
+          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.o
           file ${{ env.OUTPUT_DIR }}samples/rust/rust_minimal.o | grep -F 'ELF'
 
       - run: |
-          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.rsi
+          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.rsi
           grep -F '#![feature(prelude_import)]' ${{ env.OUTPUT_DIR }}samples/rust/rust_minimal.rsi
 
       - run: |
-          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_CROSS_COMPILE }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.s
+          make -C linux ${{ env.MAKE_ARCH }} ${{ env.MAKE_TOOLCHAIN }} ${{ env.MAKE_OUTPUT }} ${{ env.MAKE_KRUSTFLAGS }} ${{ env.JOBS }} samples/rust/rust_minimal.s
           grep -F '.text'                       ${{ env.OUTPUT_DIR }}samples/rust/rust_minimal.s
 
       # Test Rust host programs.
