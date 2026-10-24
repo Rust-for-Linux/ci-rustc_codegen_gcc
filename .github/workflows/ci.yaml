@@ -218,7 +218,7 @@ jobs:
           grep --text "^.rustc version" comment
 
       # Prepare image.
-      - run: ${{ env.OUTPUT_DIR }}usr/gen_init_cpio ci/qemu-initramfs.desc > qemu-initramfs.img
+      - run: ${{ env.OUTPUT_DIR }}scripts/gen_init_cpio ci/qemu-initramfs.desc > qemu-initramfs.img
 
       # Run in QEMU.
       - run: |
